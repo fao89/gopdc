@@ -35,7 +35,7 @@ func main() {
 		"pulp-rpm",
 	}
 	pulpcore_data := getPypiData(pypi_url)
-	fmt.Println("Latest pulpcore ", pulpcore_data.Version)
+	fmt.Println("Latest pulpcore version:", pulpcore_data.Version)
 	for _, plugin := range pulp_plugins {
 		pypi_data := getPypiData(strings.Replace(pypi_url, "pulpcore", plugin, -1))
 		req := strings.Fields(pypi_data.Requires)
@@ -47,7 +47,7 @@ func main() {
 		if err != nil {
 			panic(err.Error())
 		}
-		fmt.Println(plugin, pypi_data.Version, pypi_data.Requires, c.Check(v))
+		fmt.Println(fmt.Sprintf("%s-%s requires: %s is compatible:", plugin, pypi_data.Version, pypi_data.Requires), c.Check(v))
 	}
 }
 
