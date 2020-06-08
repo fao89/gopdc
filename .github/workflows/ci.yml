@@ -30,4 +30,6 @@ jobs:
       - name: fmt
         run: go fmt pdc.go
       - name: run
-        run: go run pdc.go
+        run: |
+          go get -u github.com/Masterminds/semver
+          go run pdc.go
