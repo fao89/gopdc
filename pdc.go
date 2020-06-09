@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -35,19 +36,14 @@ func main() {
 		"pulp-rpm",
 	}
 	pulpcore_data := getPypiData(pypi_url)
-	fmt.Println("Latest pulpcore version:", pulpcore_data.Version)
-	for _, plugin := range pulp_plugins {
-		pypi_data := getPypiData(strings.Replace(pypi_url, "pulpcore", plugin, -1))
-		req := strings.Fields(pypi_data.Requires)
-		c, err := semver.NewConstraint(req[1])
-		if err != nil {
-			c, _ = semver.NewConstraint("<3.0.1")
+	for index := range pulpcore_data.Releases {
+		pulpcore_version := pulpcore_data.Releases[len(pulpcore_data.Releases)-1-index]
+		if strings.Contains(pulpcore_version, "3.0.0") {
+			// avoiding rc versions
+			printCompatiblePlugins(pypi_url, "3.0.0", pulp_plugins)
+			break
 		}
-		v, err := semver.NewVersion(pulpcore_data.Version)
-		if err != nil {
-			panic(err.Error())
-		}
-		fmt.Println(fmt.Sprintf("%s-%s requires: %s is compatible:", plugin, pypi_data.Version, pypi_data.Requires), c.Check(v))
+		printCompatiblePlugins(pypi_url, pulpcore_version, pulp_plugins)
 	}
 }
 
@@ -74,6 +70,7 @@ func getPypiData(url string) *PypiData {
 	for i, v := range releasesInterface {
 		releases[i] = v.String()
 	}
+	sort.Strings(releases)
 
 	requiresInterface := info["requires_dist"].([]interface{})
 	requires := ""
@@ -85,4 +82,31 @@ func getPypiData(url string) *PypiData {
 	}
 
 	return &PypiData{version, requires, releases}
+}
+
+func printCompatiblePlugins(pypi_url string, pulpcore_version string, plugins []string) {
+	shown := false
+	for index, plugin := range plugins {
+		if plugin == "remove" {
+			continue
+		}
+		pypi_data := getPypiData(strings.Replace(pypi_url, "pulpcore", plugin, -1))
+		req := strings.Fields(pypi_data.Requires)
+		c, err := semver.NewConstraint(strings.Replace(req[1], "~=", "~", -1))
+		if err != nil {
+			c, _ = semver.NewConstraint("<3.0.1")
+		}
+		v, err := semver.NewVersion(pulpcore_version)
+		if err != nil {
+			panic(err.Error())
+		}
+		if c.Check(v) {
+			if !shown {
+				fmt.Println(fmt.Sprintf("\nCompatible with pulpcore-%s", pulpcore_version))
+				shown = true
+			}
+			fmt.Println(fmt.Sprintf(" -> %s-%s requirement: %s", plugin, pypi_data.Version, pypi_data.Requires))
+			plugins[index] = "remove"
+		}
+	}
 }
